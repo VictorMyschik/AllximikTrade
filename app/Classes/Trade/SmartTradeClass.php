@@ -6,10 +6,16 @@ use App\Helpers\MrDateTime;
 
 class SmartTradeClass
 {
-  public static $report = []; // ошибки при работе
+  public static array $report = []; // ошибки при работе
   protected float $quantityMin;
   protected float $quantityMax;
   protected array $calculatedOpenOrders;
+  protected float $skipSum = 5;
+
+  public function __construct()
+  {
+    self::$report = [];
+  }
 
   /**
    * Книга ордеров вместе с историей торгов
@@ -45,12 +51,13 @@ class SmartTradeClass
 
     /// Книга ордеров
     $fullOrderBook = $input['orderBook'];
-    $orderBookDiff = 0;
-    if(count($fullOrderBook))
+    if(!count($fullOrderBook))
     {
-      $orderBookDiff = round($fullOrderBook[0]['PriceSell'] * 100 / (float)$fullOrderBook[0]['PriceBuy'] - 100, 2);
-      $out['OrderBookDiff'] = $orderBookDiff;
+      return $out;
     }
+
+    $orderBookDiff = round($fullOrderBook[0]['PriceSell'] * 100 / (float)$fullOrderBook[0]['PriceBuy'] - 100, 2);
+    $out['OrderBookDiff'] = $orderBookDiff;
 
     /// Открытые ордера (все)
     $fullOpenOrders = MrExmoClass::GetOpenOrder();
@@ -89,7 +96,7 @@ class SmartTradeClass
   /**
    * Проверка актуальности открытых ордеров
    *
-   * @param array $fullOpenOrder// открытые ордера
+   * @param array $fullOpenOrder // открытые ордера
    * @param array $orderBook // книга ордеров
    * @param string $pairName // пара с которой ведётся работа
    * @return bool
@@ -107,7 +114,7 @@ class SmartTradeClass
         {
           MrExmoClass::CancelOrder($openOrder['order_id']);
 
-          return false;
+          return true;
         }
       }
     }
@@ -122,35 +129,46 @@ class SmartTradeClass
    */
   private function isActual(array $openOrder, array $orderBook): bool
   {
-    $precision = MrExmoClass::getPricePrecision()[$openOrder['pair']];
-    $myOpenPrice = round($openOrder['price'], $precision);
-    $order_book_price_sell = round($orderBook[0]['PriceSell'], $precision);
-    $order_book_price_sell_1 = round($orderBook[1]['PriceSell'], $precision);
-    $order_book_price_buy = round($orderBook[0]['PriceBuy'], $precision);
-    $order_book_price_buy_1 = round($orderBook[1]['PriceBuy'], $precision);
-
     $kind = $openOrder['type'];
+    $precision = MrExmoClass::getPricePrecision()[$openOrder['pair']];
+    $priceKeyName = ($kind == MrExmoClass::KIND_SELL) ? 'PriceSell' : 'PriceBuy';
+    $sumKeyName = ($kind == MrExmoClass::KIND_SELL) ? 'SumSell' : 'SumBuy';
+    $myOpenPrice = round($openOrder['price'], $precision);
+
+    // Получение исходной цены пропуская "мелкие" строки
+    $orderBookItem = $orderBook[0];
+    $sum = 0;
+    foreach($orderBook as $item)
+    {
+      // исключение своего ордера
+      if($item[$priceKeyName] == $openOrder['price'])
+        continue;
+
+      $sum += $item[$sumKeyName];
+      if($sum > $this->skipSum)
+      {
+        $orderBookItem = $item;
+        break;
+      }
+    }
+
+    $orderPrice = $orderBookItem[$priceKeyName];
+
     if($kind == MrExmoClass::KIND_SELL)
     {
-      if($order_book_price_sell < $myOpenPrice)
-      {
-        return false;
-      }
+      $precisionDiff = pow(10, -$precision);
+      $orderPrice = $orderPrice - $precisionDiff;
     }
 
     if($kind == MrExmoClass::KIND_BUY)
     {
-      // цена в книге ордеров больше, чем в моём ордере
-      if($order_book_price_buy > $myOpenPrice)
-      {
-        return false;
-      }
+      $precisionDiff = pow(10, -$precision);
+      $orderPrice = $orderPrice + $precisionDiff;
+    }
 
-      // Сумма открытых ордеров больше макс допустимого (на все деньги не торговать)
-      if($this->calculatedOpenOrders[$openOrder['Pair']] > $this->quantityMax)
-      {
-        return false;
-      }
+    if($orderPrice != $myOpenPrice)
+    {
+      return false;
     }
 
     return true;
@@ -170,11 +188,11 @@ class SmartTradeClass
     {
       if(isset($openOrders[$item['pair']]))
       {
-        $openOrders[$item['pair']] += round($item['amount'], 5);
+        $openOrders[$item['pair']] += round($item['amount'], 8);
       }
       else
       {
-        $openOrders[$item['pair']] = round($item['amount'], 5);
+        $openOrders[$item['pair']] = round($item['amount'], 8);
       }
     }
 
@@ -236,6 +254,12 @@ class SmartTradeClass
       $newPrice = $this->getNewPrice($order_book, MrExmoClass::KIND_BUY, $pairName);
 
       $quantity = $allowMaxTradeSum / $newPrice;
+
+      if($quantity <= $this->quantityMin)
+      {
+        return;
+      }
+
       MrExmoClass::addOrder($newPrice, $pairName, MrExmoClass::KIND_BUY, $quantity);
     }
   }
@@ -243,26 +267,59 @@ class SmartTradeClass
   /**
    * Получение новой цены для выставления ордера
    *
-   * @param array $order_book
+   * @param array $orderBook
    * @param string $type // покупка или продажа
-   * @param $pair_name
+   * @param $pairName
    * @return float
    */
-  private function getNewPrice(array $order_book, string $type, $pair_name): float
+  private function getNewPrice(array $orderBook, string $type, $pairName): float
   {
-    $precision = pow(10, -MrExmoClass::getPricePrecision()[$pair_name]);
+    $precision = MrExmoClass::getPricePrecision()[$pairName];
+    $precisionDiff = pow(10, -$precision);
+
+    // Получение исходной цены пропуская "мелкие" строки
+    $orderBookItem = $orderBook[0];
+    $sum = 0;
+    foreach($orderBook as $item)
+    {
+      $sum += ($type == MrExmoClass::KIND_SELL) ? $item['SumSell'] : $item['SumBuy'];
+      if($sum > $this->skipSum)
+      {
+        $orderBookItem = $item;
+        break;
+      }
+    }
 
     if($type == MrExmoClass::KIND_SELL)
     {
-      $old_price_sell = (float)$order_book[0]['PriceSell'];
-      $new_price = $old_price_sell - $precision;
+      $old_price_sell = (float)$orderBookItem['PriceSell'];
+      $newPrice = $old_price_sell - $precisionDiff;
     }
     else
     { // Покупка
-      $old_price_buy = (float)$order_book[0]['PriceBuy'];
-      $new_price = $old_price_buy + $precision;
+      $old_price_buy = (float)$orderBookItem['PriceBuy'];
+      $newPrice = $old_price_buy + $precisionDiff;
     }
 
-    return $new_price;
+    // Округление
+    $newPrice = round($newPrice, $precision);
+
+    return $newPrice;
   }
+
+  #region Fake
+  public function getFakeOrderBook(): array
+  {
+    $out = FakeOrderBookClass::KIND_STANDARD;
+
+
+    return $out;
+  }
+
+
+  public function tradeFakeData(array $input): array
+  {
+    return [];
+  }
+  #endregion
 }

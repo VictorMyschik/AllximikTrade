@@ -3,14 +3,13 @@
 namespace App\Classes;
 
 use App\Helpers\MrDateTime;
-use App\Helpers\Stock\MrExmoHelper;
 
 class SmartTradeClass
 {
   public static $report = []; // ошибки при работе
-  protected $quantityMin;
-  protected $quantityMax;
-  protected $calculatedOpenOrders;
+  protected float $quantityMin;
+  protected float $quantityMax;
+  protected array $calculatedOpenOrders;
 
   /**
    * Книга ордеров вместе с историей торгов
@@ -37,12 +36,12 @@ class SmartTradeClass
     $diff = (float)$input['diff'];
     $this->quantityMax = $input['maxTrade'];
     // Мин количество валюты для создания ордера
-    $this->quantityMin = MrExmoHelper::getPairsSettings()[$pair]['min_quantity'];
+    $this->quantityMin = MrExmoClass::getPairsSettings()[$pair]['min_quantity'];
 
     $out = array();
     $out['Time'] = MrDateTime::now()->getFullTime();
 
-    $out['Balance'] = $balance = MrExmoHelper::getBalance();
+    $out['Balance'] = $balance = MrExmoClass::getBalance();
 
     /// Книга ордеров
     $fullOrderBook = $input['orderBook'];
@@ -54,7 +53,7 @@ class SmartTradeClass
     }
 
     /// Открытые ордера (все)
-    $fullOpenOrders = MrExmoHelper::GetOpenOrder();
+    $fullOpenOrders = MrExmoClass::GetOpenOrder();
     $this->calculatedOpenOrders = $this->calculateOpenOrders($fullOpenOrders);
 
     // При маленькой разнице - отмена всех ордеров
@@ -64,7 +63,7 @@ class SmartTradeClass
       {
         if($openOrder['pair'] == $pair)
         {
-          MrExmoHelper::CancelOrder($openOrder['OrderId']);
+          MrExmoClass::CancelOrder($openOrder['OrderId']);
         }
       }
     }
@@ -106,7 +105,7 @@ class SmartTradeClass
         // обновление ордера
         if(!$this->isActual($openOrder, $orderBook))
         {
-          MrExmoHelper::CancelOrder($openOrder['order_id']);
+          MrExmoClass::CancelOrder($openOrder['order_id']);
 
           return false;
         }
@@ -123,7 +122,7 @@ class SmartTradeClass
    */
   private function isActual(array $openOrder, array $orderBook): bool
   {
-    $precision = MrExmoHelper::getPricePrecision()[$openOrder['pair']];
+    $precision = MrExmoClass::getPricePrecision()[$openOrder['pair']];
     $myOpenPrice = round($openOrder['price'], $precision);
     $order_book_price_sell = round($orderBook[0]['PriceSell'], $precision);
     $order_book_price_sell_1 = round($orderBook[1]['PriceSell'], $precision);
@@ -131,7 +130,7 @@ class SmartTradeClass
     $order_book_price_buy_1 = round($orderBook[1]['PriceBuy'], $precision);
 
     $kind = $openOrder['type'];
-    if($kind == MrExmoHelper::KIND_SELL)
+    if($kind == MrExmoClass::KIND_SELL)
     {
       if($order_book_price_sell < $myOpenPrice)
       {
@@ -139,7 +138,7 @@ class SmartTradeClass
       }
     }
 
-    if($kind == MrExmoHelper::KIND_BUY)
+    if($kind == MrExmoClass::KIND_BUY)
     {
       // цена в книге ордеров больше, чем в моём ордере
       if($order_book_price_buy > $myOpenPrice)
@@ -204,15 +203,15 @@ class SmartTradeClass
       {
         if($openOrder['type'] == 'sell')
         {
-          MrExmoHelper::CancelOrder($openOrder['OrderId']);
+          MrExmoClass::CancelOrder($openOrder['OrderId']);
 
           return;
         }
       }
 
       // Создание нового ордера
-      $newPrice = $this->getNewPrice($order_book, MrExmoHelper::KIND_SELL, $pairName);
-      MrExmoHelper::addOrder($newPrice, $pairName, MrExmoHelper::KIND_SELL, $balanceValue);
+      $newPrice = $this->getNewPrice($order_book, MrExmoClass::KIND_SELL, $pairName);
+      MrExmoClass::addOrder($newPrice, $pairName, MrExmoClass::KIND_SELL, $balanceValue);
 
       return;
     }
@@ -225,19 +224,19 @@ class SmartTradeClass
 
       foreach($fullOpenOrders as $openOrder)
       {
-        if($openOrder['type'] == MrExmoHelper::KIND_BUY)
+        if($openOrder['type'] == MrExmoClass::KIND_BUY)
         {
-          MrExmoHelper::CancelOrder($openOrder['OrderId']);
+          MrExmoClass::CancelOrder($openOrder['OrderId']);
 
           return;
         }
       }
 
       // Создание нового ордера
-      $newPrice = $this->getNewPrice($order_book, MrExmoHelper::KIND_BUY, $pairName);
+      $newPrice = $this->getNewPrice($order_book, MrExmoClass::KIND_BUY, $pairName);
 
       $quantity = $allowMaxTradeSum / $newPrice;
-      MrExmoHelper::addOrder($newPrice, $pairName, MrExmoHelper::KIND_BUY, $quantity);
+      MrExmoClass::addOrder($newPrice, $pairName, MrExmoClass::KIND_BUY, $quantity);
     }
   }
 
@@ -251,9 +250,9 @@ class SmartTradeClass
    */
   private function getNewPrice(array $order_book, string $type, $pair_name): float
   {
-    $precision = pow(10, -MrExmoHelper::getPricePrecision()[$pair_name]);
+    $precision = pow(10, -MrExmoClass::getPricePrecision()[$pair_name]);
 
-    if($type == MrExmoHelper::KIND_SELL)
+    if($type == MrExmoClass::KIND_SELL)
     {
       $old_price_sell = (float)$order_book[0]['PriceSell'];
       $new_price = $old_price_sell - $precision;

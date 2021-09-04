@@ -2,6 +2,7 @@
 
 namespace App\Classes;
 
+use App\Helpers\MrCacheHelper;
 use Carbon\Carbon;
 use Mockery\Exception;
 
@@ -10,8 +11,8 @@ class MrExmoClass
   const EXMO_KEY = "K-eeb135483b96892d849464156b01fed9a31a7a85";
   const EXMO_SECRET = "S-403f4a9693f9424843d8ed4e3e6384353e229df6";
 
-  const KIND_SELL = 1;
-  const KIND_BUY = 2;
+  const KIND_SELL = 'sell';
+  const KIND_BUY = 'buy';
 
   /**
    * Список валютных пар для торговли
@@ -96,7 +97,7 @@ class MrExmoClass
   public static function GetPairsSettings(): array
   {
     //return MrCacheHelper::GetCachedData('exmo_pairs', function() {
-      return self::api_query('pair_settings', array());
+    return self::api_query('pair_settings', array());
     //});
   }
 
@@ -157,17 +158,17 @@ class MrExmoClass
    *
    * @param float $price Цена сделки
    * @param string $pair_name
-   * @param int $kind Продажа/покупка
+   * @param string $kind
    * @param float $quantity Количество
    * @return mixed
    */
-  public static function addOrder(float $price, string $pair_name, int $kind, float $quantity)
+  public static function addOrder(float $price, string $pair_name, string $kind, float $quantity)
   {
     $parameters = array(
       "pair"     => $pair_name, //"BTC_USD",
       "quantity" => round($quantity, 8),
       "price"    => round($price, self::GetPricePrecision()[$pair_name]),
-      "type"     => $kind == self::KIND_SELL ? 'sell' : 'buy',//"sell"
+      "type"     => $kind
     );
 
     return self::api_query('order_create', $parameters);

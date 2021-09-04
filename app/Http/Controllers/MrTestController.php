@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Classes\SmartTradeClass;
+use App\Jobs\ExmoJobTrading;
 use Illuminate\Http\Request;
 
 class MrTestController extends Controller
@@ -25,14 +26,12 @@ class MrTestController extends Controller
 
   public static function trading(array $input)
   {
-
     $trade = new SmartTradeClass();
-    $orderBook = $trade->GetOrderBook(mb_strtoupper(str_replace('/', '_', $input['pair'])));
+    $orderBook = $trade->GetOrderBook($input['pair']);
 
     $input['orderBook'] = $orderBook;
     $result = $trade->tradeData($input);
-    dd($result);
-    sleep(1);
+    sleep(2);
     ExmoJobTrading::dispatch($input);
   }
 }

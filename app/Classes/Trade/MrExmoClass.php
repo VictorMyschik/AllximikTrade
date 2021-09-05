@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Classes;
+namespace App\Classes\Trade;
 
 use App\Helpers\MrCacheHelper;
 use Carbon\Carbon;

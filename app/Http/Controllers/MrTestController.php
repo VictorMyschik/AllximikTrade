@@ -2,20 +2,11 @@
 
 namespace App\Http\Controllers;
 
-use App\Classes\SmartTradeClass;
+use App\Classes\Trade\SmartTradeClass;
 use App\Jobs\ExmoJobTrading;
 
 class MrTestController extends Controller
 {
-  public function windex()
-  {
-    $trade = new SmartTradeClass();
-    $orderBook = $trade->getFakeOrderBook();
-
-    $input['orderBook'] = $orderBook;
-    $result = $trade->tradeFakeData($input);
-  }
-
   public function index()
   {
     $pairs = array(
@@ -39,7 +30,7 @@ class MrTestController extends Controller
 
     $input['orderBook'] = $orderBook;
     $result = $trade->tradeData($input);
-    sleep(2);
+    sleep(1);
     ExmoJobTrading::dispatch($input);
   }
 }

@@ -13,7 +13,7 @@ class ExmoJobTrading implements ShouldQueue
 {
   use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-  protected $input;
+  protected array $input;
 
   public function __construct(array $input)
   {

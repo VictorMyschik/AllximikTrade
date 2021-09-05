@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Classes;
+namespace App\Classes\Trade;
 
 use App\Helpers\MrDateTime;
 
@@ -306,20 +306,4 @@ class SmartTradeClass
 
     return $newPrice;
   }
-
-  #region Fake
-  public function getFakeOrderBook(): array
-  {
-    $out = FakeOrderBookClass::KIND_STANDARD;
-
-
-    return $out;
-  }
-
-
-  public function tradeFakeData(array $input): array
-  {
-    return [];
-  }
-  #endregion
 }

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\MrTestController;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -17,6 +18,14 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', function() {
   return view('welcome');
 });
+// Очистка кеша
+Route::get('/clear', function() {
+  Artisan::call('cache:clear');
+  Artisan::call('view:clear');
+  Artisan::call('route:clear');
 
+  //composer dump-autoload --optimize
+  return back();
+})->name('clear');
 
 Route::match(['get', 'post'], '/test', [MrTestController::class, 'index'])->name('admin_test');

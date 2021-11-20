@@ -10,7 +10,7 @@ class SmartTradeClass
   protected float $quantityMin;
   protected float $quantityMax;
   protected array $calculatedOpenOrders;
-  protected float $skipSum = 5;
+  protected float $skipSum = 15;
 
   public function __construct()
   {
@@ -25,7 +25,7 @@ class SmartTradeClass
    */
   public function GetOrderBook(string $pair): array
   {
-    return MrExmoClass::GetOrderBook($pair, 5);
+    return MrExmoClass::GetOrderBook($pair, 50);
   }
 
   /**
@@ -70,7 +70,7 @@ class SmartTradeClass
       {
         if($openOrder['pair'] == $pair)
         {
-          MrExmoClass::CancelOrder($openOrder['OrderId']);
+          MrExmoClass::CancelOrder($openOrder['order_id']);
         }
       }
     }
@@ -166,9 +166,11 @@ class SmartTradeClass
       $orderPrice = $orderPrice + $precisionDiff;
     }
 
-    if($orderPrice != $myOpenPrice)
+    $orderPrice = round($orderPrice, $precision);
+
+    if((string)$orderPrice != (string)$myOpenPrice)
     {
-      return false;
+      return false; // нужно обновить ордер
     }
 
     return true;
@@ -221,7 +223,7 @@ class SmartTradeClass
       {
         if($openOrder['type'] == 'sell')
         {
-          MrExmoClass::CancelOrder($openOrder['OrderId']);
+          MrExmoClass::CancelOrder($openOrder['order_id']);
 
           return;
         }
@@ -235,7 +237,8 @@ class SmartTradeClass
     }
 
     /// Покупка MNX за USD
-    if($balanceValue = $balance[$currencySecond] ?? null)
+    $balanceValue = $balance[$currencySecond] ?? 0;
+    if($balanceValue > 0.0001)
     {
       // Сумма, которую можно потратить. Не позволяем тратить все деньги.
       $allowMaxTradeSum = $balanceValue > $this->quantityMax ? $this->quantityMax : $balanceValue;
@@ -244,7 +247,7 @@ class SmartTradeClass
       {
         if($openOrder['type'] == MrExmoClass::KIND_BUY)
         {
-          MrExmoClass::CancelOrder($openOrder['OrderId']);
+          MrExmoClass::CancelOrder($openOrder['order_id']);
 
           return;
         }
@@ -304,6 +307,7 @@ class SmartTradeClass
     // Округление
     $newPrice = round($newPrice, $precision);
 
+//dd($newPrice);
     return $newPrice;
   }
 }

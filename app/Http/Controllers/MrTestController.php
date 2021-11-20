@@ -10,14 +10,14 @@ class MrTestController extends Controller
   public function index()
   {
     $pairs = array(
-      'MNC_USD',// 'ONE/BTC'
+      'SHIB_USD', 'MNC_USD'
     );
 
     foreach($pairs as $pair)
     {
       self::trading([
-        'diff'     => 1.2,
-        'maxTrade' => 100,
+        'diff'     => 0.5,
+        'maxTrade' => 20,
         'pair'     => $pair
       ]);
     }
@@ -27,10 +27,9 @@ class MrTestController extends Controller
   {
     $trade = new SmartTradeClass();
     $orderBook = $trade->GetOrderBook($input['pair']);
-
     $input['orderBook'] = $orderBook;
     $result = $trade->tradeData($input);
-    sleep(1);
+    //sleep(2);
     ExmoJobTrading::dispatch($input);
   }
 }

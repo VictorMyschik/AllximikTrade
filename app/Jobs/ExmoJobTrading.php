@@ -18,6 +18,7 @@ class ExmoJobTrading implements ShouldQueue
   public function __construct(array $input)
   {
     $this->input = $input;
+    $this->connection = 'redis';
   }
 
   /**

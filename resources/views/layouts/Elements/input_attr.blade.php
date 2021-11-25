@@ -1,0 +1,1 @@
+@foreach($attributes as $key_attr => $val_attr){{$key_attr}}='{{$val_attr}}' @endforeach

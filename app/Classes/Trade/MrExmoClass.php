@@ -16,20 +16,15 @@ class MrExmoClass
 
   /**
    * Список валютных пар для торговли
-   *
-   * @param string $delimiter
-   * @return array
    */
-  public static function GetUsdPairs(string $delimiter = '/'): array
+  public static function GetPairsByName(string $name, string $delimiter = '/'): array
   {
     $pairs = array();
 
-    foreach(self::GetPairsSettings() as $key => $item)
-    {
+    foreach(self::GetPairsSettings() as $key => $item) {
       $tmp = explode('_', (string)mb_convert_case($key, MB_CASE_UPPER, "UTF-8"));
 
-      if($tmp[1] != 'USD')
-      {
+      if($name !== $tmp[1]) {
         continue;
       }
 
@@ -58,7 +53,7 @@ class MrExmoClass
     return $pairs;
   }
 
-  private static $precision;
+  private static array $precision = [];
 
   /**
    * Округление
@@ -96,9 +91,9 @@ class MrExmoClass
    */
   public static function GetPairsSettings(): array
   {
-    //return MrCacheHelper::GetCachedData('exmo_pairs', function() {
-    return self::api_query('pair_settings', array());
-    //});
+    return MrCacheHelper::GetCachedData('exmo_pairs', function() {
+      return self::api_query('pair_settings', array());
+    });
   }
 
   /**
@@ -109,7 +104,7 @@ class MrExmoClass
    * @param array $req
    * @return mixed
    */
-  protected static function api_query($api_name, array $req = array())
+  protected static function api_query($api_name, array $req = array()): mixed
   {
     $mt = explode(' ', microtime());
     $NONCE = $mt[1] . substr($mt[0], 2, 6);
@@ -117,7 +112,7 @@ class MrExmoClass
     $url = "https://api.exmo.com/v1.1/$api_name";
     $req['nonce'] = $NONCE;
     // generate the POST data string
-    $post_data = http_build_query($req, '', '&');
+    $post_data = http_build_query($req);
     $sign = hash_hmac('sha512', $post_data, self::EXMO_SECRET);
     // generate the extra headers
     $headers = array(
@@ -155,19 +150,16 @@ class MrExmoClass
 
   /**
    * Создание ордера
-   *
-   * @param float $price Цена сделки
-   * @param string $pair_name
-   * @param string $kind
-   * @param float $quantity Количество
-   * @return mixed
    */
-  public static function addOrder(float $price, string $pair_name, string $kind, float $quantity)
+  public static function addOrder(float $price, string $pairName, string $kind, float $quantity): mixed
   {
+    $tmp_num = (explode('.', $quantity));
+    $precisionDiff = pow(10, -strlen($tmp_num[1]));
+    $finalQuantity = $quantity - $precisionDiff;
     $parameters = array(
-      "pair"     => $pair_name, //"BTC_USD",
-      "quantity" => round($quantity, 8),
-      "price"    => round($price, self::GetPricePrecision()[$pair_name]),
+      "pair"     => $pairName,  //"BTC_USD",
+      "quantity" => $finalQuantity,
+      "price"    => $price,
       "type"     => $kind
     );
 
@@ -176,8 +168,6 @@ class MrExmoClass
 
   /**
    * Отмена ордера
-   *
-   * @param int $order_id
    */
   public static function cancelOrder(int $order_id)
   {
@@ -186,8 +176,6 @@ class MrExmoClass
 
   /**
    * Получение баланса
-   *
-   * @return mixed
    */
   public static function GetBalance(): array
   {
@@ -226,7 +214,6 @@ class MrExmoClass
     {
       $result_book[] = array_merge($item, $history[$key] ?? array());
     }
-
     return $result_book;
   }
 
@@ -234,8 +221,7 @@ class MrExmoClass
   {
     $out = array();
 
-    foreach($data[$pair] as $row)
-    {
+    foreach($data[$pair] as $row) {
       $item = array();
       $item['KindTraded'] = $row['type'] == 'buy' ? self::KIND_BUY : self::KIND_SELL;
       // Количество
@@ -243,7 +229,8 @@ class MrExmoClass
       $item['PriceTraded'] = round($row['price'], 5);
       // Сумма
       $item['SumTraded'] = round($row['amount'], 5);
-      $item['TimeTraded'] = Carbon::createFromTimestamp($row['date'])->toDateTime()->format('H:i:s');;
+      $item['TimeTraded'] = Carbon::createFromTimestamp($row['date'])->toDateTime()->format('H:i:s');
+      $item['timestamp'] = $row['date'];
 
       $out[] = $item;
     }
@@ -303,8 +290,7 @@ class MrExmoClass
     $rows = [];
 
     // Количество
-    foreach($data[$pair]['ask'] as $key => $item)
-    {
+    foreach($data[$pair]['ask'] as $key => $item) {
       $row = array();
       $row['PriceSell'] = round($item[0], 8);
       $row['QuantitySell'] = round($item[1], 4);

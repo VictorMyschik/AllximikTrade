@@ -3,6 +3,7 @@
 namespace App\Classes\Trade;
 
 use App\Helpers\MrDateTime;
+use Illuminate\Support\Facades\DB;
 
 class SmartTradeClass
 {
@@ -10,7 +11,7 @@ class SmartTradeClass
   protected float $quantityMin;
   protected float $quantityMax;
   protected array $calculatedOpenOrders;
-  protected float $skipSum = 15;
+  protected float $skipSum = 20;
 
   public function __construct()
   {
@@ -37,6 +38,8 @@ class SmartTradeClass
   public function tradeData(array $input): array
   {
     MrDateTime::Start();
+
+    //$this->setSkipSum($input['orderBook']);
 
     $pair = $input['pair'];
     $diff = (float)$input['diff'];
@@ -216,13 +219,10 @@ class SmartTradeClass
     $balanceValue = $balance[$currencyFirst] ?? 0;
 
     /// Продажа MNX
-    if($balanceValue > $this->quantityMin)
-    {
+    if($balanceValue > $this->quantityMin) {
       // если при этом уже есть имеющийся открытый ордер
-      foreach($fullOpenOrders as $openOrder)
-      {
-        if($openOrder['type'] == 'sell')
-        {
+      foreach($fullOpenOrders as $openOrder) {
+        if($openOrder['type'] == 'sell') {
           MrExmoClass::CancelOrder($openOrder['order_id']);
 
           return;
@@ -231,14 +231,18 @@ class SmartTradeClass
 
       // Создание нового ордера
       $newPrice = $this->getNewPrice($order_book, MrExmoClass::KIND_SELL, $pairName);
-      MrExmoClass::addOrder($newPrice, $pairName, MrExmoClass::KIND_SELL, $balanceValue);
+      $r = MrExmoClass::addOrder($newPrice, $pairName, MrExmoClass::KIND_SELL, $balanceValue);
+
+      if($r['result'] === false) {
+        $this->setLog($r, 2);
+      }
 
       return;
     }
 
     /// Покупка MNX за USD
     $balanceValue = $balance[$currencySecond] ?? 0;
-    if($balanceValue > 0.0001)
+    if($balanceValue > 0.01)
     {
       // Сумма, которую можно потратить. Не позволяем тратить все деньги.
       $allowMaxTradeSum = $balanceValue > $this->quantityMax ? $this->quantityMax : $balanceValue;
@@ -258,24 +262,29 @@ class SmartTradeClass
 
       $quantity = $allowMaxTradeSum / $newPrice;
 
-      if($quantity <= $this->quantityMin)
-      {
+      if($quantity <= $this->quantityMin) {
         return;
       }
 
-      MrExmoClass::addOrder($newPrice, $pairName, MrExmoClass::KIND_BUY, $quantity);
+      $r = MrExmoClass::addOrder($newPrice, $pairName, MrExmoClass::KIND_BUY, $quantity);
+      if($r['result'] === false) {
+        $this->setLog($r, 1);
+      }
     }
+  }
+
+  private function setLog(array $response, int $kind)
+  {
+    DB::table('trade_logs')->insert([
+      'Message' => $response['error'],
+      'Kind'    => $kind,
+    ]);
   }
 
   /**
    * Получение новой цены для выставления ордера
-   *
-   * @param array $orderBook
-   * @param string $type // покупка или продажа
-   * @param $pairName
-   * @return float
    */
-  private function getNewPrice(array $orderBook, string $type, $pairName): float
+  private function getNewPrice(array $orderBook, string $type, string $pairName): float
   {
     $precision = MrExmoClass::getPricePrecision()[$pairName];
     $precisionDiff = pow(10, -$precision);

@@ -5,10 +5,40 @@ namespace App\Http\Controllers;
 use App\Classes\Trade\MrExmoClass;
 use App\Classes\Trade\SmartTradeClass;
 use App\Jobs\ExmoJobTrading;
+use App\Jobs\TradingJob;
 use Illuminate\Support\Facades\DB;
 
 class MrTestController extends Controller
 {
+  public function trading()
+  {
+    $parameters = [
+      [
+        'stock'    => 'Exmo',
+        'diff'     => 0.2,
+        'maxTrade' => 200,
+        'pair'     => 'SHIB_USD'
+      ]
+    ];
+
+    foreach($parameters as $parameter) {
+      self::tradingByStock($parameter);
+    }
+  }
+
+  public static function tradingByStock(array $parameter)
+  {
+    $className = $parameter['stock'] . 'Class';
+    $class = "App\\Classes\\" . $className;
+
+    if(class_exists($class, true)) {
+      $object = new $class($parameter);
+      $object->trade();
+
+      TradingJob::dispatch($parameter);
+    }
+  }
+
   public function index()
   {
     $pairs = array(
@@ -16,17 +46,43 @@ class MrTestController extends Controller
     );
 
     foreach($pairs as $pair) {
-      self::trading([
-        'diff'     => 0.3,
-        'maxTrade' => 120,
+      self::tradingExmo([
+        'diff'     => 0.2,
+        'maxTrade' => 200,
         'pair'     => $pair
       ]);
     }
   }
 
-  public static function trading(array $input)
+  public function testYobit()
   {
-    $trade = new SmartTradeClass();
+    $pairs = array(
+      'shib_usd'//, 'SHIB_USDT'
+    );
+
+    foreach($pairs as $pair) {
+      self::tradingYobit([
+        'diff'     => 0.2,
+        'maxTrade' => 200,
+        'pair'     => $pair
+      ]);
+    }
+  }
+
+  public static function tradingYobit(array $input)
+  {
+    $trade = new SmartTradeClass(SmartTradeClass::YOBIT);
+    $orderBook = $trade->GetOrderBook($input['pair']);
+    $input['orderBook'] = $orderBook;
+    $result = $trade->tradeData($input);
+    dd($result);
+    //sleep(1);
+    //ExmoJobTrading::dispatch($input);
+  }
+
+  public static function tradingExmo(array $input)
+  {
+    $trade = new SmartTradeClass(SmartTradeClass::EXMO);
     $orderBook = $trade->GetOrderBook($input['pair']);
     $input['orderBook'] = $orderBook;
     $result = $trade->tradeData($input);

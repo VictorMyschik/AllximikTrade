@@ -35,3 +35,5 @@ Route::get('/clear', function() {
 
 Route::match(['get', 'post'], '/test', [MrTestController::class, 'index'])->name('admin_test');
 Route::match(['get', 'post'], '/test2', [MrTestController::class, 'index2']);
+Route::match(['get', 'post'], '/yobit', [MrTestController::class, 'testYobit']);
+Route::match(['get', 'post'], '/trading', [MrTestController::class, 'trading']);

@@ -9,7 +9,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 
-class ExmoJobTrading implements ShouldQueue
+class TradingJob implements ShouldQueue
 {
   use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -28,6 +28,6 @@ class ExmoJobTrading implements ShouldQueue
    */
   public function handle()
   {
-    MrTestController::tradingExmo($this->input);
+    MrTestController::tradingByStock($this->input);
   }
 }

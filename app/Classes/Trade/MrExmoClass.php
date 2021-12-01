@@ -8,9 +8,6 @@ use Mockery\Exception;
 
 class MrExmoClass
 {
-  const EXMO_KEY = "K-eeb135483b96892d849464156b01fed9a31a7a85";
-  const EXMO_SECRET = "S-403f4a9693f9424843d8ed4e3e6384353e229df6";
-
   const KIND_SELL = 'sell';
   const KIND_BUY = 'buy';
 
@@ -113,11 +110,11 @@ class MrExmoClass
     $req['nonce'] = $NONCE;
     // generate the POST data string
     $post_data = http_build_query($req);
-    $sign = hash_hmac('sha512', $post_data, self::EXMO_SECRET);
+    $sign = hash_hmac('sha512', $post_data, '???');
     // generate the extra headers
     $headers = array(
       'Sign: ' . $sign,
-      'Key: ' . self::EXMO_KEY,
+      'Key: ' . '???',
     );
     // our curl handle (initialize if required)
     static $ch = null;

@@ -8,9 +8,6 @@ use Mockery\Exception;
 
 class ExmoClass extends TradeBaseClass implements TradingInterface
 {
-  const EXMO_KEY = "K-eeb135483b96892d849464156b01fed9a31a7a85";
-  const EXMO_SECRET = "S-403f4a9693f9424843d8ed4e3e6384353e229df6";
-
   private array $precision = [];
 
   /**
@@ -20,10 +17,10 @@ class ExmoClass extends TradeBaseClass implements TradingInterface
   {
     $resultBook = array();
     $param = array('pair' => $this->pair, 'limit' => $limit);
-    $book = $this->parseOrderBook(self::api_query('order_book', $param));
+    $book = $this->parseOrderBook(self::apiQuery('order_book', $param));
 
     $param = array('pair' => $this->pair);
-    $history = $this->parseHistory(self::api_query('trades', $param));
+    $history = $this->parseHistory(self::apiQuery('trades', $param));
 
     foreach($book as $key => $item) {
       $resultBook[] = array_merge($item, $history[$key] ?? array());
@@ -52,7 +49,7 @@ class ExmoClass extends TradeBaseClass implements TradingInterface
     return $rows;
   }
 
-  public function parseHistory(array $data): array
+  protected function parseHistory(array $data): array
   {
     $out = array();
 
@@ -73,11 +70,11 @@ class ExmoClass extends TradeBaseClass implements TradingInterface
     return $out;
   }
 
-  public function getPricePrecision(): array
+  protected function getPricePrecision(): array
   {
     if(!count($this->precision)) {
       $this->precision = MrCacheHelper::GetCachedData(self::class . '_price_precision', function() {
-        $pairs = array();
+        $pairs = [];
         foreach(self::getPairsSettings() as $key => $item) {
           $pairs[$key] = $item['price_precision'];
         }
@@ -90,16 +87,16 @@ class ExmoClass extends TradeBaseClass implements TradingInterface
     return $this->precision;
   }
 
-  public function getPairsSettings(): array
+  protected function getPairsSettings(): array
   {
     return MrCacheHelper::GetCachedData(self::class . '_PairsSettings', function() {
-      return $this->api_query('pair_settings', array());
+      return $this->apiQuery('pair_settings', array());
     });
   }
 
-  public function getBalance(): array
+  protected function getBalance(): array
   {
-    $response = $this->api_query('user_info', array());
+    $response = $this->apiQuery('user_info', array());
 
     $balanceOut = array();
 
@@ -112,7 +109,7 @@ class ExmoClass extends TradeBaseClass implements TradingInterface
     return $balanceOut;
   }
 
-  public function addOrder(float $price, string $pairName, string $kind, float $quantity): mixed
+  protected function addOrder(float $price, string $pairName, string $kind, float $quantity): mixed
   {
     $tmp_num = (explode('.', $quantity));
     $precisionDiff = pow(10, -strlen($tmp_num[1]));
@@ -125,17 +122,17 @@ class ExmoClass extends TradeBaseClass implements TradingInterface
       "type"     => $kind
     );
 
-    return $this->api_query('order_create', $parameters);
+    return $this->apiQuery('order_create', $parameters);
   }
 
-  public function cancelOrder(int $orderId)
+  protected function cancelOrder(int $orderId)
   {
-    $this->api_query('order_cancel', ["order_id" => $orderId]);
+    $this->apiQuery('order_cancel', ["order_id" => $orderId]);
   }
 
-  public function getOpenOrder(): array
+  protected function getOpenOrder(): array
   {
-    $list = $this->api_query('user_open_orders', array());
+    $list = $this->apiQuery('user_open_orders', array());
 
     if(isset($list['result'])) {
       return [];
@@ -158,22 +155,22 @@ class ExmoClass extends TradeBaseClass implements TradingInterface
    * API Exmo
    * Downloaded from https://github.com/exmo-dev/exmo_api_lib/blob/master/php/exmo.php
    */
-  private function api_query($api_name, array $req = array()): mixed
+  private function apiQuery($apiName, array $req = []): mixed
   {
     $mt = explode(' ', microtime());
     $NONCE = $mt[1] . substr($mt[0], 2, 6);
     // API settings
-    $url = "https://api.exmo.com/v1.1/$api_name";
+    $url = "https://api.exmo.com/v1.1/$apiName";
     $req['nonce'] = $NONCE;
     // generate the POST data string
     $post_data = http_build_query($req);
-    $sign = hash_hmac('sha512', $post_data, self::EXMO_SECRET);
+    $sign = hash_hmac('sha512', $post_data, env('EXMO_SECRET'));
     // generate the extra headers
     $headers = array(
       'Sign: ' . $sign,
-      'Key: ' . self::EXMO_KEY,
+      'Key: ' . env('EXMO_KEY'),
     );
-    // our curl handle (initialize if required)
+
     static $ch = null;
 
     if(is_null($ch)) {
